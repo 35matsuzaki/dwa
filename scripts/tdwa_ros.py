@@ -1,5 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import rospy
+from geometry_msgs.msg import Twist
+from std_msgs.msg import String
 
 import random
 import math
@@ -31,7 +34,8 @@ obstacle = [
     [7, 9, 1],
 ]  # [x,y,size]
 obstacleR = 1.0 #obstacle tolerance
-dt = 0.1 #duration time [s]
+hz = 10 #rospy.Rate(hz) [hz]
+dt = 1.0/hz #duration time [s]
 # preT = 0.3 #prediction time #TODO use relative velocity
 
 def toRadian(degree):
@@ -57,6 +61,8 @@ evalParam=[0.1, 0.5, 1000000, 3.0];
 area=[-2,15,-2,15]
 #range of demo area
 area_dw=[-1,1,-0.5,1.5]
+
+
 
 def DynamicWindowApproach(x):
     Vr, preVr = CalcDynamicWindow(x)
@@ -123,8 +129,9 @@ def GenerateTrajectory(x,vt,ot,evaldt):
     u=[vt, ot]
     traj = [[]]
     traj.append(x)
+    duration = 0.1
     while time<=evaldt:
-        time=time+dt
+        time=time+duration
         x=f(x,u)
         traj.append(x)
         #TODO collision check here?
@@ -170,7 +177,7 @@ def CalcObstacleEval(x,preT):
     minDist = 2.0 #FIXME
     ob_vel = -0.8
     predictTime = 1.0 #TODO use relative velocity between robot and an obstacle
-    duration = dt
+    duration = 0.1
     predictObstacle = list(obstacle)
     #for t in dragne(0.0, predictTime, duration):
     for i in range(len(predictObstacle)):
@@ -203,9 +210,14 @@ def CalcHeadingEval(x):#TODO change degree to radian
 def CalcDynamicWindow(x):
     #TODO collision check
     #window1: input range
+
+    # minDist = CalcDistEval(x)
+
     Vs=[0, model[0], -model[1], model[1]];#TODO add backward to Vs[0]
+    # Vs=[-model[0], model[0], -model[1], model[1]];#TODO add backward to Vs[0]
     #window2: kinematic constraints
-    Vd=[x[3]-model[2]*dt*4, x[3]+model[2]*dt, x[4]-model[3]*dt, x[4]+model[3]*dt]
+    Vd=[x[3]-model[2]*dt, x[3]+model[2]*dt, x[4]-model[3]*dt, x[4]+model[3]*dt]
+    # Vd=[x[3]-model[2]*dt*4, x[3]+model[2]*dt, x[4]-model[3]*dt, x[4]+model[3]*dt]
     #window: intersection window1 and window2
     Vr=[max(Vs[0],Vd[0]), min(Vs[1],Vd[1]), max(Vs[2],Vd[2]), min(Vs[3],Vd[3])]
 
@@ -214,7 +226,7 @@ def CalcDynamicWindow(x):
     preVr=[max(Vs[0],preVd[0]), min(Vs[1],preVd[1]), max(Vs[2],preVd[2]), min(Vs[3],preVd[3])]
 
 
-    DrawDynamicWindow(Vs, Vd, Vr, preVd, preVr, x)
+    # DrawDynamicWindow(Vs, Vd, Vr, preVd, preVr, x)
 
     return Vr, preVr
 
@@ -301,28 +313,54 @@ def DrawGraph(x, trajDB, path):
     ax1.set_aspect('equal', adjustable='box')
     # plt.pause(0.01)
 
-def run(count):
+def run():
     global x, path
 
-    if count == 0:
-        del path[0] #delete initial
+    # if count == 0:
+    #     del path[0] #delete initial
+    # pub = rospy.Publisher('/cmd_vel_src/nav', Twist, queue_size=1)
+    pub = rospy.Publisher('/mobile_base/commands/velocity', Twist, queue_size=1)
+    rospy.init_node('talker', anonymous=True)
+    rate = rospy.Rate(hz)
 
-    path.append(x)
-    # for i in range(5000):
-    # print i,x
-    u,trajDB=DynamicWindowApproach(x)
-    x=f(x,u)#move robot using kinematic
-    path.append(x)
-    MoveObstacle()
+    while not rospy.is_shutdown():
+        # for i in range(5000):
+        # print i,x
+        u,trajDB=DynamicWindowApproach(x)
+        x=f(x,u)#move robot using kinematic
+        path.append(x)
+        MoveObstacle()
+        msg = Twist()
 
-    if math.sqrt((goal[0] - x[0])*(goal[0] - x[0])+(goal[1] - x[1])*(goal[1] - x[1])) < 0.5:
-        print "Arrive Goal"
-    DrawGraph(x, trajDB, path)
+        if math.sqrt((goal[0] - x[0])*(goal[0] - x[0])+(goal[1] - x[1])*(goal[1] - x[1])) < 0.5:
+            rospy.loginfo("Goal reached: %s" % x)
+            msg.linear.x = 0.0
+            msg.linear.y = 0.0
+            msg.linear.z = 0.0
+            msg.angular.x = 0.0
+            msg.angular.y = 0.0
+            msg.angular.z = 0.0
+            break
+
+        msg.linear.x = u[0]
+        msg.linear.y = 0.0
+        msg.linear.z = 0.0
+        msg.angular.x = 0.0
+        msg.angular.y = 0.0
+        msg.angular.z = u[1]
+        pub.publish(msg)
+        rate.sleep()
+        rospy.loginfo("Current state: %s" % x)
+
+
+
+
+    # DrawGraph(x, trajDB, path)
 
 
 
 
 if __name__ == '__main__':
-
-    ani = animation.FuncAnimation(fig, run, interval=10)
-    plt.show()
+    run()
+    # ani = animation.FuncAnimation(fig, run, interval=10)
+    # plt.show()
