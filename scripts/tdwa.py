@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.animation as animation
 
-x = [0.0, 0.0, math.pi/2, 0.0, 0.0] #robot initial state [x(m),y(m),yaw(Rad),v(m/s),w(rad/s)]
+x = [0.0, 0.0, 0.0, 0.0, 0.0] #robot initial state [x(m),y(m),yaw(Rad),v(m/s),w(rad/s)]
 
 fig = plt.figure()
 ax1 = fig.add_subplot(121)
@@ -19,12 +19,6 @@ goal = [10, 10] #goal position [x(m),y(m)]
 goalR  = 1.0
 path=[[]]
 obstacle = [
-    # [0, 2, 1],
-    # [4, 2, 1],
-    # [4, 4, 1],
-    # [5, 4, 1],
-    # [5, 5, 1],
-    # [5, 6, 1],
     [5, 9, 1],
     [8, 8, 1],
     [8, 9, 1],
@@ -46,12 +40,12 @@ def drange(begin, end, step):
         yield n
         n += step
 
-model=[1.0,toRadian(20.0),0.2,toRadian(50.0),0.01,toRadian(1.0)];
+model=[0.7,toRadian(20.0),0.2,toRadian(50.0),0.01,toRadian(1.0)];
 #model:Kinematic
 #[max_velocity[m/s],max_angular_velocity[rad/s],max_acc[m/ss], max_angular_acc[rad/ss],
 # vel_resolution[m/s],angular_vel_resolution[rad/s]]
 
-evalParam=[0.1, 0.5, 1000000, 3.0];
+evalParam=[0.1, 0.5, 0.2, 3.0];
 #[heading,dist,velocity,predictSimTime]
 
 area=[-2,15,-2,15]
@@ -108,14 +102,14 @@ def Evaluation(x, Vr):
     return evalDB, trajDB
 
 def NormalizeEval(EvalDB):
-    #EvalDB=np.array[earch trajector][[vt,ot,heading,dist,vel]]
+    #EvalDB=np.array[earch trajectory][[vt,ot,heading,dist,vel]]
     sumArray=np.sum(EvalDB, axis=0)
-    # if sumArray[2] != 0:
-    #     EvalDB=EvalDB /[1,1,sumArray[2],1,1]
-    # if sumArray[3] != 0:
-    #     EvalDB=EvalDB /[1,1,1,sumArray[3],1]
-    # if sumArray[4] != 0:
-    #     EvalDB=EvalDB /[1,1,1,1,sumArray[4]]
+    if sumArray[2] != 0:
+        EvalDB=EvalDB /[1,1,sumArray[2],1,1]
+    if sumArray[3] != 0:
+        EvalDB=EvalDB /[1,1,1,sumArray[3],1]
+    if sumArray[4] != 0:
+        EvalDB=EvalDB /[1,1,1,1,sumArray[4]]
     return EvalDB
 
 def GenerateTrajectory(x,vt,ot,evaldt):
@@ -198,14 +192,14 @@ def CalcHeadingEval(x):#TODO change degree to radian
     # dist = math.sqrt((goal[0] - x[0])*(goal[0] - x[0]) + (goal[1] - x[1])*(goal[1] - x[1]))
     # dist = distStartTOGoal - math.sqrt(dist)
 
-    return heading*0.000003+1.0/dist
+    return heading+1.0/dist #TODO use some function to calculate dist cost
 
 def CalcDynamicWindow(x):
     #TODO collision check
     #window1: input range
     Vs=[0, model[0], -model[1], model[1]];#TODO add backward to Vs[0]
     #window2: kinematic constraints
-    Vd=[x[3]-model[2]*dt*4, x[3]+model[2]*dt, x[4]-model[3]*dt, x[4]+model[3]*dt]
+    Vd=[x[3]-model[2]*dt, x[3]+model[2]*dt, x[4]-model[3]*dt, x[4]+model[3]*dt]
     #window: intersection window1 and window2
     Vr=[max(Vs[0],Vd[0]), min(Vs[1],Vd[1]), max(Vs[2],Vd[2]), min(Vs[3],Vd[3])]
 
