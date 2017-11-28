@@ -1,6 +1,10 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 // #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <vector>
@@ -39,6 +43,7 @@ private:
 
   //Publisher
   ros::Publisher m_pubCmdVel;
+  ros::Publisher m_pubMarkerArray;
 
   //TF
 
@@ -99,12 +104,22 @@ bool DynamicWindowApproach::initNode()
 
   m_pubCmdVel = m_nodeHandle.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 10, true);
 
+  m_pubMarkerArray = m_nodeHandle.advertise<visualization_msgs::MarkerArray>("visualization_marker", 10, true);
   return true;
 }
 
 
 void DynamicWindowApproach::evaluation(const Eigen::VectorXd x, const Eigen::Vector4d Vr, Eigen::MatrixXd& evalDB){
   //TODO add trajDB for vizualization
+  nav_msgs::Path predictPath;
+  predictPath.poses.resize(path.size());
+  predictPath.header.frame_id = "map"
+  predictPath.header.stamp = ros::Time::now();
+
+  see global_planner planner_core.cpp
+  for path.size()
+   predictPath.poses[i] = path[i];
+
   int count = 1;
   for(double vt=Vr[0]; vt<Vr[1]; vt=vt+model[4]){
     for(double ot=Vr[2]; ot<Vr[3]; ot=ot+model[5]){
@@ -212,16 +227,42 @@ void DynamicWindowApproach::f(Eigen::VectorXd& x, const Eigen::Vector2d u){
         1.0, 0.0,
         0.0, 1.0;
   x = F * x + B * u;
-  // std::cout<<x<<std::endl;
 }
 
 
 void DynamicWindowApproach::moveObstacle(){
   double obVel = -0.8;
+  visualization_msgs::MarkerArray markerArray;
   for(int i=0; i<obstacle.size(); ++i){
     obstacle[i][0] = obstacle[i][0] + dt * obVel;
     obstacle[i][1] = obstacle[i][1] + dt * obVel;
+    //
+    // visualization_msgs::Marker marker;
+    // marker.header.frame_id = "map";
+    // marker.header.stamp = ros::Time::now();
+    // marker.ns = "basic_obstacle";
+    // marker.id = i;
+    // marker.type = visualization_msgs::Marker::CYLINDER;
+    // marker.action = visualization_msgs::Marker::ADD;
+    // marker.pose.position.x = obstacle[i][0];
+    // marker.pose.position.y = obstacle[i][1];
+    // marker.pose.position.z = 0.9;
+    // marker.pose.orientation.x = 0.0;
+    // marker.pose.orientation.y = 0.0;
+    // marker.pose.orientation.z = 0.0;
+    // marker.pose.orientation.w = 1.0;
+    // marker.scale.x = 0.2;
+    // marker.scale.y = 0.4;
+    // marker.scale.z = 1.8;
+    // marker.color.r = 0.0f;
+    // marker.color.g = 0.0f;
+    // marker.color.b = 0.7f;
+    // marker.color.a = 1.0;
+    // marker.lifetime = ros::Duration();
+    // markerArray.markers.push_back(marker);
   }
+  // m_pubMarkerArray.publish(markerArray);
+
 }
 
 
@@ -234,7 +275,7 @@ void DynamicWindowApproach::run()
   ros::Rate rate(10.0); //HZ
 
   while(ros::ok()){
-    std::cout<<x<<std::endl;
+    std::cout<<x<<std::endl<<std::endl;
     Eigen::Vector4d Vr;
     calcDynamicWindow(x, Vr);
 
